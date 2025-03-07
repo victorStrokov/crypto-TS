@@ -32,12 +32,15 @@ ChartJS.register(
 function App() {
   const [cryptos, setCryptos] = React.useState<Crypto[] | null>(null);
   const [selected, setSelected] = React.useState<Crypto | null>();
+
+  const [range, setRange] = React.useState<number>(30);
+
   const [data, setData] = React.useState<ChartData<'line'>>();
   const [options, setOtions] = React.useState<ChartOptions<'line'>>({
     responsive: true,
     plugins: {
       legend: {
-        position: 'top' as const,
+       display: false // position: 'top' as const,
       },
       title: {
         display: true,
@@ -54,6 +57,48 @@ function App() {
     //  .then().catch(err => {console.log(err);
     //  })
   }, []);
+
+  React.useEffect(() => {
+    if (!selected) return;// если ничего не выбрано не запрашивай 
+    // запрос графика
+    axios
+      .get(
+        `https://api.coingecko.com/api/v3/coins/${selected?.id}/market_chart?vs_currency=usd&days=${range}&${range}'interval=daily'`
+      ) // 
+      .then((response) => {
+        console.log(response.data);
+        setData({
+          labels: response.data.prices.map((price: number[]) => {
+            return moment
+              .unix(price[0] / 1000)
+              .format(range === 2 ? 'HH:MM' : 'DD:MM');
+          }),
+          datasets: [
+            {
+              label: 'Dataset 1',
+              data: response.data.prices.map((price: number[]) => {
+                return price[1].toFixed(2);
+              }),
+              borderColor: 'rgb(255, 99, 132)',
+              backgroundColor: 'rgba(255, 99, 132, 0.5)',
+            },
+          ],
+        });
+        setOtions({
+          responsive: true,
+          plugins: {
+            legend: {
+              display: false, // position: 'top' as const,
+            },
+            title: {
+              display: true,
+              text: `Price Over Last ${range} Days.`, //+(range === 2 ? "Day." : "Days."),
+            },
+          },
+        });
+      });
+  }, [selected, range]);
+
   return (
     <>
       <div className="App">
@@ -62,29 +107,6 @@ function App() {
             // выбор монеты по названию
             const c = cryptos?.find((x) => x.id === e.target.value);
             setSelected(c);
-            // запрос графика
-            axios
-              .get(
-                `https://api.coingecko.com/api/v3/coins/${c?.id}/market_chart?vs_currency=usd&days=30&interval=daily`
-              )
-              .then((response) => {
-                console.log(response.data);
-                setData({
-                  labels: response.data.prices.map((price: number[]) => {
-                    return moment.unix(price[0] / 1000).format('MM-DD');
-                  }),
-                  datasets: [
-                    {
-                      label: 'Dataset 1',
-                      data: response.data.prices.map((price: number[]) => {
-                        return price[1];
-                      }),
-                      borderColor: 'rgb(255, 99, 132)',
-                      backgroundColor: 'rgba(255, 99, 132, 0.5)',
-                    },
-                  ],
-                });
-              });
           }}
           defaultValue="default"
         >
@@ -99,6 +121,15 @@ function App() {
                 );
               })
             : null}
+        </select>
+        <select
+          onChange={(e) => {
+            setRange(parseInt(e.target.value)); // конвертируем строку в число
+          }}
+        >
+          <option value={30}>30 Days</option>
+          <option value={7}>7 Days</option>
+          <option value={2}>2 Days</option>
         </select>
       </div>
       {selected ? <CryptoSummary crypto={selected} /> : null}
