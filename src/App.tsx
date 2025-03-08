@@ -9,10 +9,11 @@ import {
   Title,
   Tooltip,
   Legend,
+  ArcElement,
 } from 'chart.js';
-import { Line } from 'react-chartjs-2';
+import { Pie } from 'react-chartjs-2';
 import type { ChartData, ChartOptions } from 'chart.js';
-import moment from 'moment';
+// import moment from 'moment';
 
 import './App.css';
 
@@ -20,44 +21,32 @@ import { Crypto } from './types/Types';
 import CryptoSummary from './components/CryptoSummary';
 
 ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Title,
+  ArcElement,
   Tooltip,
   Legend
+  // CategoryScale,
+  // LinearScale,
+  // PointElement,
+  // LineElement,
+  // Title,
 );
 
 function App() {
   const [cryptos, setCryptos] = React.useState<Crypto[] | null>(null);
-  const [selected, setSelected] = React.useState<Crypto | null>();
+  const [selected, setSelected] = React.useState<Crypto[]>([]);
 
-  const [range, setRange] = React.useState<number>(30);
+  // const [range, setRange] = React.useState<number>(30);
 
-  const [data, setData] = React.useState<ChartData<'line'>>();
-  const [options, setOtions] = React.useState<ChartOptions<'line'>>({
-    responsive: true,
-    plugins: {
-      legend: {
-       display: false // position: 'top' as const,
-      },
-      title: {
-        display: true,
-        text: 'Chart.js Line Chart',
-      },
-    },
-  });
+  const [data, setData] = React.useState<ChartData<'pie'>>();
+
   React.useEffect(() => {
     const url =
       'https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd';
     axios.get(url).then((response) => {
       setCryptos(response.data);
     });
-    //  .then().catch(err => {console.log(err);
-    //  })
   }, []);
-
+  /*
   React.useEffect(() => {
     if (!selected) return;// если ничего не выбрано не запрашивай 
     // запрос графика
@@ -98,6 +87,49 @@ function App() {
         });
       });
   }, [selected, range]);
+*/
+
+  React.useEffect(() => {
+    console.log('SELECTED', selected);
+    if (selected.length === 0) return;
+    setData({
+      labels: selected.map((s) => s.name), // добавляем названия монет
+      datasets: [
+        {
+          label: '# of Votes',
+          data: selected.map((s) => s.owned * s.current_price), // добавляем кол-во монет отображаемых в графике 
+          backgroundColor: [
+            'rgba(255, 99, 132, 0.2)',
+            'rgba(54, 162, 235, 0.2)',
+            'rgba(255, 206, 86, 0.2)',
+            'rgba(75, 192, 192, 0.2)',
+            'rgba(153, 102, 255, 0.2)',
+            'rgba(255, 159, 64, 0.2)',
+          ],
+          borderColor: [
+            'rgba(255, 99, 132, 1)',
+            'rgba(54, 162, 235, 1)',
+            'rgba(255, 206, 86, 1)',
+            'rgba(75, 192, 192, 1)',
+            'rgba(153, 102, 255, 1)',
+            'rgba(255, 159, 64, 1)',
+          ],
+          borderWidth: 1,
+        },
+      ],
+    });
+  }, [selected]);
+  function updateOwned(crypto: Crypto, amount: number): void {
+    console.log('updateOwned', amount, crypto);
+    let temp = [...selected];
+    let tempObj = temp.find((c) => c.id === crypto.id);
+    if (tempObj) {
+      tempObj.owned = amount;
+      setSelected(temp);
+    }
+    // ваша логика изменения количества у текущей монеты
+    //...
+  }
 
   return (
     <>
@@ -105,8 +137,8 @@ function App() {
         <select
           onChange={(e) => {
             // выбор монеты по названию
-            const c = cryptos?.find((x) => x.id === e.target.value);
-            setSelected(c);
+            const c = cryptos?.find((x) => x.id === e.target.value) as Crypto;
+            setSelected([...selected, c]);
           }}
           defaultValue="default"
         >
@@ -122,7 +154,7 @@ function App() {
               })
             : null}
         </select>
-        <select
+        {/* <select
           onChange={(e) => {
             setRange(parseInt(e.target.value)); // конвертируем строку в число
           }}
@@ -130,15 +162,40 @@ function App() {
           <option value={30}>30 Days</option>
           <option value={7}>7 Days</option>
           <option value={2}>2 Days</option>
-        </select>
+        </select> */}
       </div>
-      {selected ? <CryptoSummary crypto={selected} /> : null}
+
+      {selected.map((s) => {
+        return <CryptoSummary crypto={s} updateOwned={updateOwned} />;
+      })}
+
+      {/*selected ? <CryptoSummary crypto={selected} /> : null*/}
       {/* выводим выбранную монету */}
       {data ? (
-        <div style={{ width: 600, height: 400 }}>
-          <Line options={options} data={data} />
+        <div style={{ width: 600 }}>
+          <Pie data={data} />
         </div>
       ) : null}
+
+      {selected
+        ? 'Your portfolio is worth: $ ' +
+          selected
+            .map((s) => {
+              if (isNaN(s.owned)) {
+                return 0;
+              }
+              return s.current_price * s.owned;
+            })
+            .reduce((prev, current) => {
+              console.log('prev, current', prev, current);
+
+              return prev + current;
+            }, 0)
+            .toLocaleString(undefined, {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            })
+        : null}
     </>
   );
 }
